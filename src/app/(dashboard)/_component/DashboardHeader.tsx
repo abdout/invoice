@@ -1,17 +1,15 @@
-import { auth } from "@/lib/auth"
+import { currentUser } from "@/lib/auth"
 import UserProfileDropDown from "./UserProfileDropdown"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 
 export default async function DashboardHeader(){
-    const session = await auth()
+    const user = await currentUser()
     return(
        <header className="sticky top-0 h-14  w-full border-b backdrop-blur-3xl flex items-center px-4">
             <SidebarTrigger/>
             <div>
                 Welcome <span className="font-semibold">
-                    <span>{session?.user.firstName ?? "-"}</span>
-                    {" "}
-                    <span>{session?.user.lastName ?? "-"}</span>
+                    <span>{user?.name ?? "-"}</span>
                 </span>
             </div>
 

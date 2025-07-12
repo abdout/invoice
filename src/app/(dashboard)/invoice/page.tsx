@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { auth } from "../../../auth";
 import InvoiceClientPage from "../_component/InvoiceClientPage";
 import { Suspense } from "react";
 import Loading from "@/components/Loading";

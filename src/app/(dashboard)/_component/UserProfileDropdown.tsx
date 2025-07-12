@@ -7,10 +7,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { auth, signOut } from "@/lib/auth";
+import { auth } from "../../../auth";
+import { getUserById } from "@/data/user";
 import getAvatarName from "@/lib/getAvatarName";
 import { ChevronDown } from "lucide-react";
 import UserProfile from "./UserProfile";
+import { signOut } from "next-auth/react";
 
 interface IUserProfileDropdown {
   isFullName: boolean;
@@ -22,24 +24,27 @@ export default async function UserProfileDropDown({
   isArrowUp,
 }: IUserProfileDropdown) {
   const session = await auth();
+  const user = session?.user;
+  const extendedUser = user ? await getUserById(user.id) : null;
+  
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <div className="flex items-center gap-3 cursor-pointer">
           <Avatar className="border size-9 bg-neutral-300 cursor-pointer">
-            <AvatarImage src={session?.user.image as string} />
+            <AvatarImage src={user?.image || ""} />
             <AvatarFallback>
               {getAvatarName(
-                session?.user.firstName as string,
-                session?.user.lastName as string
+                extendedUser?.firstName || "",
+                extendedUser?.lastName || ""
               )}
             </AvatarFallback>
           </Avatar>
-          {isFullName && (
+          {isFullName && extendedUser && (
             <div>
               <p className="text-ellipsis line-clamp-1 font-medium">
-                <span>{session?.user.firstName}</span>{" "}
-                <span>{session?.user.lastName}</span>
+                <span>{extendedUser.firstName}</span>{" "}
+                <span>{extendedUser.lastName}</span>
               </p>
             </div>
           )}

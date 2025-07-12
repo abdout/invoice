@@ -1,0 +1,163 @@
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model User {
+  id                    String                 @id @default(cuid())
+  username              String?
+  firstName             String?
+  lastName              String?
+  email                 String?                @unique
+  emailVerified         DateTime?
+  image                 String?
+  password              String?
+  role                  UserRole              @default(USER)
+  currency             String                 @default("USD")
+  accounts              Account[]
+  isTwoFactorEnabled    Boolean               @default(false)
+  twoFactorConfirmation TwoFactorConfirmation?
+  settings             Settings?
+  invoices             Invoice[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+}
+
+model Account {
+  id                 String   @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model VerificationToken {
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
+}
+
+model PasswordResetToken {
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
+}
+
+model TwoFactorToken {
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
+}
+
+model TwoFactorConfirmation {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Invoice {
+  id             String     @id @default(cuid())
+  invoice_no     String
+  invoice_date   DateTime
+  due_date       DateTime
+  currency       String     @default("USD")
+  from           Address    @relation("FromAddress", fields: [fromAddressId], references: [id])
+  fromAddressId  String     @unique
+  to             Address    @relation("ToAddress", fields: [toAddressId], references: [id])
+  toAddressId    String     @unique
+  items          Item[]
+  sub_total      Float
+  discount       Float?
+  tax_percentage Float?
+  total          Float
+  notes          String?    @db.Text
+  status         Status     @default(UNPAID)
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([userId])
+}
+
+enum Status {
+  PAID
+  UNPAID
+  CANCEL
+}
+
+model Item {
+  id         String   @id @default(cuid())
+  item_name  String
+  quantity   Int
+  price      Float
+  total      Float
+  invoiceId  String
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([invoiceId])
+}
+
+model Address {
+  id           String    @id @default(cuid())
+  name         String
+  email        String?
+  address1     String
+  address2     String?
+  address3     String?
+  fromInvoice  Invoice?  @relation("FromAddress")
+  toInvoice    Invoice?  @relation("ToAddress")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Settings {
+  id          String    @id @default(cuid())
+  invoiceLogo String?
+  signature   Signature?
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Signature {
+  id         String    @id @default(cuid())
+  name       String?
+  image      String?
+  settingsId String    @unique
+  settings   Settings  @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+}

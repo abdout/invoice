@@ -7,10 +7,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import UserEditProfile from "./UserEditProfile";
-import { auth } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
+import { getUserById } from "@/components/auth/user";
+
 
 export default async function UserProfile() {
-  const session = await auth();
+  const user = await currentUser();
+  const extendedUser = user ? await getUserById(user.id) : null;
+  
   return (
     <Dialog>
       <DialogTrigger className="w-full text-left px-2 py-1 cursor-pointer hover:bg-muted-foreground/5">
@@ -24,10 +28,10 @@ export default async function UserProfile() {
 
         {/**user profile display and editor */}
         <UserEditProfile
-          firstName={session?.user.firstName}
-          lastName={session?.user.lastName}
-          currency={session?.user.currency}
-          email={session?.user.email}
+          firstName={extendedUser?.firstName || undefined}
+          lastName={extendedUser?.lastName || undefined}
+          currency={extendedUser?.currency || undefined}
+          email={user?.email || undefined}
         />
       </DialogContent>
     </Dialog>
