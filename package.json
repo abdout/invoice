@@ -41,6 +41,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.60.0",
     "react-hot-toast": "^2.5.2",
+    "react-spinners": "^0.17.0",
     "recharts": "^2.15.3",
     "resend": "^4.5.1",
     "sonner": "^2.0.6",
