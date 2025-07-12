@@ -194,3 +194,33 @@ export async function getInvoices(page: number = 1, limit: number = 5) {
     return { success: false, error: "Failed to fetch invoices" }
   }
 }
+
+export async function getInvoiceById(id: string) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized")
+    }
+
+    const invoice = await db.invoice.findUnique({
+      where: { 
+        id,
+        userId: session.user.id 
+      },
+      include: {
+        items: true,
+        from: true,
+        to: true
+      }
+    });
+
+    if (!invoice) {
+      return { success: false, error: "Invoice not found" }
+    }
+
+    return { success: true, data: invoice }
+  } catch (error) {
+    console.error(error)
+    return { success: false, error: "Failed to fetch invoice" }
+  }
+}

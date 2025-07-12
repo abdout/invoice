@@ -3,10 +3,12 @@ import Loading from "@/components/Loading";
 import { buttonVariants } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/DateTable";
 import { cn } from "@/lib/utils";
-import { IInvoice } from "@/models/invoice.model";
+import { getInvoices } from "@/actions/invoice";
+import { sendInvoiceEmail } from "@/actions/email";
+import { toast } from "sonner";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import type { Invoice } from "@/types/invoice";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import {
@@ -35,27 +37,27 @@ interface IInvoiceClientPage {
   userId : string | undefined
 }
 
-export default function InvoiceClientPage({userId, currency }: IInvoiceClientPage) {
-  const [data, setData] = useState<IInvoice[]>([]);
+export default function InvoiceClientPage({userId, currency = "USD" }: IInvoiceClientPage) {
+  const [data, setData] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [page, setPage] = useState<number>(1);
   const [totalPage, setTotalPage] = useState<number>(1);
-  const router = useRouter()
+  const router = useRouter();
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/invoice?page=${page}`);
-      const responseData = await response.json();
+      const response = await getInvoices(page);
 
-      if (response.status === 200) {
-        setData(responseData.data || []);
-        setTotalPage(responseData.totalPage || 1);
+      if (response.success) {
+        setData(response.data || []);
+        setTotalPage(response.pagination?.pages || 1);
       } else {
-        toast.error("Something went wrong");
+        toast.error(response.error || "Something went wrong");
       }
     } catch (error) {
-      console.log(error);
+      console.error(error);
+      toast.error("Failed to fetch invoices");
     } finally {
       setIsLoading(false);
     }
@@ -65,31 +67,23 @@ export default function InvoiceClientPage({userId, currency }: IInvoiceClientPag
     fetchData();
   }, [page]);
 
-  const handleSendEmail = async(invoiceId : string,subject : string)=>{
+  const handleSendEmail = async (invoiceId: string, subject: string) => {
     try {
-      toast.loading("Please wait...")
-      const response = await fetch(`/api/email/${invoiceId}`,{
-        method : "post",
-        body : JSON.stringify({
-          subject : subject
-        })
-      })
+      toast.loading("Please wait...");
+      const response = await sendInvoiceEmail(invoiceId, subject);
 
-      const responsedata = await response.json()
-
-      if(response.status === 200){
-        toast.success(responsedata.message)
+      if (response.success) {
+        toast.success(response.message);
+      } else {
+        toast.error(response.error);
       }
     } catch (error) {
-      console.log(error)
-    }finally{
-      setTimeout(()=>{
-        toast.dismiss()
-      },2000)
+      console.error(error);
+      toast.error("Failed to send email");
     }
   }
 
-  const columns: ColumnDef<IInvoice>[] = [
+  const columns: ColumnDef<Invoice>[] = [
     {
       accessorKey: "invoice_no",
       header: "Invoice No",
@@ -116,9 +110,12 @@ export default function InvoiceClientPage({userId, currency }: IInvoiceClientPag
       accessorKey: "total",
       header: "Amount",
       cell: ({ row }) => {
-        const totalAmountInCurrencyFormat = new Intl.NumberFormat("en-us", {
+        // Use the invoice's currency if available, fall back to the provided currency or USD
+        const currencyCode = row.original.currency || currency || "USD";
+        
+        const totalAmountInCurrencyFormat = new Intl.NumberFormat("en-US", {
           style: "currency",
-          currency: currency,
+          currency: currencyCode,
         }).format(row.original.total);
 
         return totalAmountInCurrencyFormat;
@@ -132,11 +129,10 @@ export default function InvoiceClientPage({userId, currency }: IInvoiceClientPag
        }
     },
     {
-      accessorKey: "_id", //id not in use
+      accessorKey: "id",
       header: "Action",
       cell: ({ row }) => {
-
-        const invoiceId = row.original._id?.toString()
+        const invoiceId = row.original.id;
         return (
           <DropdownMenu>
             <DropdownMenuTrigger>
@@ -144,10 +140,10 @@ export default function InvoiceClientPage({userId, currency }: IInvoiceClientPag
               <MoreVerticalIcon className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={()=>router.push(`/api/invoice/${userId}/${invoiceId}`)}>View</DropdownMenuItem>
-              <DropdownMenuItem onClick={()=>router.push(`/invoice/edit/${invoiceId}`)}>Edit</DropdownMenuItem>
-              <DropdownMenuItem onClick={()=>router.push(`/invoice/paid/${invoiceId}`)}>Paid</DropdownMenuItem>
-              <DropdownMenuItem onClick={()=>handleSendEmail(invoiceId as string,`Invoice from ${row.original.from.name}`)}>Send Email</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/invoice/view/${invoiceId}`)}>View</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/invoice/edit/${invoiceId}`)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/invoice/paid/${invoiceId}`)}>Paid</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSendEmail(invoiceId, `Invoice from ${row.original.from.name}`)}>Send Email</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );

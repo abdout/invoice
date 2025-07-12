@@ -1,24 +1,22 @@
 "use client";
+import { CalendarIcon, DeleteIcon } from "lucide-react";
+import { useFieldArray, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { format } from "date-fns";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
+import { InvoiceSchemaZod } from "@/lib/zodSchema";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { InvoiceSchemaZod } from "@/lib/zodSchema";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
-import { CalendarIcon, DeleteIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
-import { z } from "zod";
-import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { Textarea } from "@/components/ui/textarea";
+import { createInvoice, updateInvoice, getInvoiceById } from "@/actions/invoice";
+import * as z from "zod";
 
 interface ICreateEditInvoice {
   firstName?: string | undefined;
@@ -71,19 +69,51 @@ export default function CreateEditInvoice({
 
   const fetchData = async () => {
     try {
+      if (!invoiceId) return;
       setIsLoading(true);
-      const response = await fetch(`/api/invoice?invoiceId=${invoiceId}`);
-      const responseData = await response.json();
+      const response = await getInvoiceById(invoiceId);
 
-      if (response.status === 200) {
-        const invoiceData = responseData.data[0];
-        reset({
-          ...invoiceData,
-          invoice_date: new Date(invoiceData.invoice_date),
-          due_date: new Date(invoiceData.due_date),
-        });
+      if (response.success && response.data) {
+        const { from, to, items, ...rest } = response.data;
+        const formData = {
+          invoice_no: rest.invoice_no,
+          invoice_date: new Date(rest.invoice_date),
+          due_date: new Date(rest.due_date),
+          currency: rest.currency || undefined,
+          from: {
+            name: from.name,
+            email: from.email || undefined,
+            address1: from.address1,
+            address2: from.address2 || undefined,
+            address3: from.address3 || undefined,
+          },
+          to: {
+            name: to.name,
+            email: to.email || undefined,
+            address1: to.address1,
+            address2: to.address2 || undefined,
+            address3: to.address3 || undefined,
+          },
+          items: items.map(item => ({
+            item_name: item.item_name,
+            quantity: item.quantity,
+            price: item.price,
+            total: item.total,
+          })),
+          sub_total: rest.sub_total,
+          discount: rest.discount || undefined,
+          tax_percentage: rest.tax_percentage || undefined,
+          total: rest.total,
+          notes: rest.notes || undefined,
+          status: rest.status,
+        };
+        
+        reset(formData);
+      } else {
+        toast.error(response.error || "Failed to fetch invoice data");
       }
     } catch (error) {
+      toast.error("Failed to fetch invoice data");
     } finally {
       setIsLoading(false);
     }
@@ -134,47 +164,21 @@ export default function CreateEditInvoice({
   };
 
   const onSubmit = async (data: z.infer<typeof InvoiceSchemaZod>) => {
-    // console.log("onSubmit", data);
+    setIsLoading(true);
+    try {
+      const response = !invoiceId
+        ? await createInvoice(data)
+        : await updateInvoice(invoiceId, data);
 
-    //for create invoice
-    if (!invoiceId) {
-      setIsLoading(true);
-      const response = await fetch("/api/invoice", {
-        method: "post",
-        body: JSON.stringify(data),
-      });
-      const responseData = await response.json();
-
-      if (response.status === 200) {
-        toast.success(responseData?.message);
+      if (response.success) {
+        toast.success(invoiceId ? "Invoice updated successfully" : "Invoice created successfully");
         router.push("/invoice");
       } else {
-        toast.error("Something went wrong");
-      }
-      setIsLoading(false);
-      return;
-    }
-
-    //for edit invoice
-    try {
-      setIsLoading(true);
-      const response = await fetch("/api/invoice", {
-        method: "put",
-        body: JSON.stringify({
-          invoiceId,
-          ...data,
-        }),
-      });
-      const responseData = await response.json();
-
-      if (response.status === 200) {
-        toast.success("Invoice updated Successfully");
-        router.push("/invoice")
-      } else {
-        toast.error("Something went wrong");
+        toast.error(response.error || "Something went wrong");
       }
     } catch (error) {
-      console.log(error);
+      console.error(error);
+      toast.error("Failed to process invoice");
     } finally {
       setIsLoading(false);
     }
